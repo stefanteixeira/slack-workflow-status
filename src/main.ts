@@ -164,8 +164,8 @@ async function main(): Promise<void> {
 
   // Payload Formatting Shortcuts
   const workflow_duration = compute_duration({
-    start: new Date(workflow_run.created_at),
-    end: new Date(workflow_run.updated_at)
+    start: new Date(workflow_run.created_at.toString()),
+    end: new Date(workflow_run.updated_at.toString())
   })
   const repo_url = `<${workflow_run.repository.html_url}|*${workflow_run.repository.full_name}*>`
   const branch_url = `<${workflow_run.repository.html_url}/tree/${workflow_run.head_branch}|*${workflow_run.head_branch}*>`

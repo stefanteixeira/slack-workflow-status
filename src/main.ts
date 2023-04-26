@@ -180,6 +180,7 @@ async function main(): Promise<void> {
   let status_string = `${workflow_msg} ${context.actor}'s \`${context.eventName}\` on \`${branch_url}\``
   // Example: Workflow: My Workflow #14 completed in `1m 30s`
   const details_string = `Workflow: ${context.workflow} ${workflow_run_url} completed in \`${workflow_duration}\``
+  const debug_string = `Debug: ${workflow_run.created_at} / ${workflow_run.updated_at}`
 
   // Build Pull Request string if required
   const pull_requests = (workflow_run.pull_requests as PullRequest[])
@@ -206,7 +207,7 @@ async function main(): Promise<void> {
   const slack_attachment = {
     mrkdwn_in: ['text' as const],
     color: workflow_color,
-    text: [status_string, details_string]
+    text: [status_string, details_string, debug_string]
       .concat(include_commit_message ? [commit_message] : [])
       .join('\n'),
     footer: repo_url,

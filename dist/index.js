@@ -12620,6 +12620,7 @@ function main() {
         let status_string = `${workflow_msg} ${github_1.context.actor}'s \`${github_1.context.eventName}\` on \`${branch_url}\``;
         // Example: Workflow: My Workflow #14 completed in `1m 30s`
         const details_string = `Workflow: ${github_1.context.workflow} ${workflow_run_url} completed in \`${workflow_duration}\``;
+        const debug_string = `Debug: ${workflow_run.created_at} / ${workflow_run.updated_at}`;
         // Build Pull Request string if required
         const pull_requests = workflow_run.pull_requests
             .filter(pull_request => pull_request.base.repo.url === workflow_run.repository.url // exclude PRs from external repositories
@@ -12637,7 +12638,7 @@ function main() {
         const slack_attachment = {
             mrkdwn_in: ['text'],
             color: workflow_color,
-            text: [status_string, details_string]
+            text: [status_string, details_string, debug_string]
                 .concat(include_commit_message ? [commit_message] : [])
                 .join('\n'),
             footer: repo_url,

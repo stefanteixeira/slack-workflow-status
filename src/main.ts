@@ -169,9 +169,15 @@ async function main(): Promise<void> {
   })
 
   // Payload Formatting Shortcuts
+  const start = new Date(workflow_run.created_at.toString())
+  const end =
+    workflow_run.updated_at === workflow_run.created_at
+      ? new Date()
+      : new Date(workflow_run.updated_at.toString())
+
   const workflow_duration = compute_duration({
-    start: new Date(workflow_run.created_at.toString()),
-    end: new Date(workflow_run.updated_at.toString())
+    start,
+    end
   })
   const repo_url = `<${workflow_run.repository.html_url}|*${workflow_run.repository.full_name}*>`
   const branch_url = `<${workflow_run.repository.html_url}/tree/${workflow_run.head_branch}|*${workflow_run.head_branch}*>`
@@ -180,7 +186,6 @@ async function main(): Promise<void> {
   let status_string = `${workflow_msg} ${context.actor}'s \`${context.eventName}\` on \`${branch_url}\``
   // Example: Workflow: My Workflow #14 completed in `1m 30s`
   const details_string = `Workflow: ${context.workflow} ${workflow_run_url} completed in \`${workflow_duration}\``
-  const debug_string = `Debug: ${workflow_run.created_at} / ${workflow_run.updated_at}`
 
   // Build Pull Request string if required
   const pull_requests = (workflow_run.pull_requests as PullRequest[])
@@ -207,7 +212,7 @@ async function main(): Promise<void> {
   const slack_attachment = {
     mrkdwn_in: ['text' as const],
     color: workflow_color,
-    text: [status_string, details_string, debug_string]
+    text: [status_string, details_string]
       .concat(include_commit_message ? [commit_message] : [])
       .join('\n'),
     footer: repo_url,

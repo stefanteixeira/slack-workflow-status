@@ -58,6 +58,10 @@ async function main(): Promise<void> {
   const include_jobs = core.getInput('include_jobs', {
     required: true
   }) as IncludeJobs
+  const display_only_failed =
+    core.getInput('display_only_failed', {
+      required: true
+    }) === 'true'
   const include_commit_message =
     core.getInput('include_commit_message', {
       required: true
@@ -72,18 +76,20 @@ async function main(): Promise<void> {
   // Auth github with octokit module
   const octokit = getOctokit(github_token)
   // Fetch workflow run data
-  const {data: workflow_run} = await octokit.actions.getWorkflowRun({
+  const {data: workflow_run} = await octokit.rest.actions.getWorkflowRun({
     owner: context.repo.owner,
     repo: context.repo.repo,
     run_id: context.runId
   })
 
   // Fetch workflow job information
-  const {data: jobs_response} = await octokit.actions.listJobsForWorkflowRun({
+  const {
+    data: jobs_response
+  } = await octokit.rest.actions.listJobsForWorkflowRun({
     owner: context.repo.owner,
     repo: context.repo.repo,
     run_id: context.runId,
-    per_page: parseInt(jobs_to_fetch, 30),
+    per_page: 100
   })
 
   const completed_jobs = jobs_response.jobs.filter(
@@ -97,7 +103,11 @@ async function main(): Promise<void> {
   let job_fields: SlackMessageAttachementFields
 
   if (
-    completed_jobs.every(job => ['success', 'skipped'].includes(job.conclusion))
+    completed_jobs.every(
+      job =>
+        job.conclusion !== null &&
+        ['success', 'skipped'].includes(job.conclusion)
+    )
   ) {
     workflow_color = 'good'
     workflow_msg = 'Success:'
@@ -111,7 +121,7 @@ async function main(): Promise<void> {
       job_fields = []
     }
   } else {
-    // (jobs_response.jobs.some(job => job.conclusion === 'failed')
+    // (jobs_response.jobs.some(job => job.conclusion === 'failure')
     workflow_color = 'danger'
     workflow_msg = 'Failed:'
   }
@@ -121,7 +131,17 @@ async function main(): Promise<void> {
   }
 
   // Build Job Data Fields
-  job_fields ??= completed_jobs.map(job => {
+  let jobs_list
+
+  if (display_only_failed) {
+    jobs_list = completed_jobs.filter(
+      job => job.conclusion === 'failure' || job.conclusion === 'cancelled'
+    )
+  } else {
+    jobs_list = completed_jobs
+  }
+
+  job_fields ??= jobs_list.map(job => {
     let job_status_icon
 
     switch (job.conclusion) {
@@ -138,8 +158,8 @@ async function main(): Promise<void> {
     }
 
     const job_duration = compute_duration({
-      start: new Date(job.started_at),
-      end: new Date(job.completed_at)
+      start: new Date(job.started_at ?? new Date(0)),
+      end: new Date(job.completed_at ?? new Date(0))
     })
 
     return {
@@ -150,9 +170,15 @@ async function main(): Promise<void> {
   })
 
   // Payload Formatting Shortcuts
+  const start = new Date(workflow_run.created_at.toString())
+  const end =
+    workflow_run.updated_at === workflow_run.created_at
+      ? new Date()
+      : new Date(workflow_run.updated_at.toString())
+
   const workflow_duration = compute_duration({
-    start: new Date(workflow_run.created_at),
-    end: new Date(workflow_run.updated_at)
+    start,
+    end
   })
   const repo_url = `<${workflow_run.repository.html_url}|*${workflow_run.repository.full_name}*>`
   const branch_url = `<${workflow_run.repository.html_url}/tree/${workflow_run.head_branch}|*${workflow_run.head_branch}*>`
@@ -165,8 +191,7 @@ async function main(): Promise<void> {
   // Build Pull Request string if required
   const pull_requests = (workflow_run.pull_requests as PullRequest[])
     .filter(
-      pull_request =>
-        pull_request.base.repo.url === workflow_run.repository.url // exclude PRs from external repositories
+      pull_request => pull_request.base.repo.url === workflow_run.repository.url // exclude PRs from external repositories
     )
     .map(
       pull_request =>
@@ -178,7 +203,8 @@ async function main(): Promise<void> {
     status_string = `${workflow_msg} ${context.actor}'s \`pull_request\` ${pull_requests}`
   }
 
-  const commit_message = `Commit: ${workflow_run.head_commit.message}`
+  const commit_message = `Commit: ${workflow_run.head_commit?.message}`
+  const commit_sha = `SHA: \`${workflow_run.head_sha}\``
 
   // We're using old style attachments rather than the new blocks because:
   // - Blocks don't allow colour indicators on messages
@@ -189,7 +215,7 @@ async function main(): Promise<void> {
     mrkdwn_in: ['text' as const],
     color: workflow_color,
     text: [status_string, details_string]
-      .concat(include_commit_message ? [commit_message] : [])
+      .concat(include_commit_message ? [commit_message, commit_sha] : [])
       .join('\n'),
     footer: repo_url,
     footer_icon: 'https://github.githubassets.com/favicon.ico',

@@ -54,6 +54,7 @@ async function main(): Promise<void> {
     required: true
   })
   const github_token = core.getInput('repo_token', {required: true})
+  const jobs_to_fetch = core.getInput("jobs_to_fetch", {required: true})
   const include_jobs = core.getInput('include_jobs', {
     required: true
   }) as IncludeJobs
@@ -203,6 +204,7 @@ async function main(): Promise<void> {
   }
 
   const commit_message = `Commit: ${workflow_run.head_commit?.message}`
+  const commit_sha = `SHA: \`${workflow_run.head_sha}\``
 
   // We're using old style attachments rather than the new blocks because:
   // - Blocks don't allow colour indicators on messages
@@ -213,7 +215,7 @@ async function main(): Promise<void> {
     mrkdwn_in: ['text' as const],
     color: workflow_color,
     text: [status_string, details_string]
-      .concat(include_commit_message ? [commit_message] : [])
+      .concat(include_commit_message ? [commit_message, commit_sha] : [])
       .join('\n'),
     footer: repo_url,
     footer_icon: 'https://github.githubassets.com/favicon.ico',
